@@ -19,28 +19,34 @@ let ldapClient = new Client(
     reconnect: {
       initialDelay: config.ldap.reconnectInitialDelay,
       maxDelay: config.ldap.reconnectMaxDelay,
-      failAfter: config.ldap.reconnectFailAfter
-    }
+      failAfter: config.ldap.reconnectFailAfter,
+    },
   }),
   config.ldap.baseDn,
   config.ldap.bindDn,
-  config.ldap.bindPw
+  config.ldap.bindPw,
+  logger
 );
+
 let authenticator = new Authenticator(ldapClient, config.ldap.filter, logger);
 
 // setup api dependencies
 let healthz = new Healthz();
+
 let userAuthentication = new UserAuthentication(
   authenticator,
   config.jwt.tokenLifetime,
   config.jwt.key,
   new Mapping(
+    ldapClient,
     config.mapping.username,
     config.mapping.uid,
     config.mapping.groups,
     config.mapping.extraFields,
+    logger
   ),
   logger);
+
 let tokenAuthentication = new TokenAuthentication(config.jwt.key, logger);
 
 // setup express
@@ -53,7 +59,9 @@ app.use(morgan('combined', {
     },
   },
 }));
+
 app.get('/healthz', healthz.run);
+//
 app.get('/auth', userAuthentication.run);
 app.post('/token', bodyParser.json(), tokenAuthentication.run);
 
