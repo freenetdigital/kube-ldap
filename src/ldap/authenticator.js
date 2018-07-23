@@ -21,6 +21,8 @@ export default class Authenticator {
     this.logger = logger;
   }
 
+
+
   /**
   * Authenticate user on ldap.
   * @param {string} username - username to authenticate.
@@ -30,8 +32,10 @@ export default class Authenticator {
   async authenticate(username: string, password: string): Promise<boolean> {
     let filter = util.format(this.filter, username);
     try {
+      // searches for the user supplied in Auth header
       let user = await this.client.search(filter);
-      return await this.client.bind(user.dn, password);
+
+      return await this.client.bind(user[0].dn, password);
     } catch (error) {
       this.logger.info(error.message);
       return false;
@@ -51,14 +55,15 @@ export default class Authenticator {
     let filter = util.format(this.filter, username);
     try {
       let result = await this.client.search(filter, attributes);
-      return Object.keys(result)
-        .filter((attribute) => attributes.includes(attribute))
-        .reduce((object, attribute) => {
+      let user = result[0]
+      return Object.keys(user)
+        .filter((attribute) => attributes.includes(attribute)).reduce((object, attribute) => {
           return {
             ...object,
-            [attribute]: result[attribute],
+            [attribute]: user[attribute],
           };
-        }, {});
+        },
+        {});
     } catch (error) {
       throw error;
     }
