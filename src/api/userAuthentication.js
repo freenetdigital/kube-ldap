@@ -86,7 +86,8 @@ export default class UserAuthentication {
         this.mapping.getLdapAttributes()
       );
 
-      let data = this.mapping.ldapToKubernetes(user);
+      let data = await this.mapping.ldapToKubernetes(user);
+
       let token = jwt.sign(data, this.key, {
         expiresIn: this.tokenLifetime,
       });
