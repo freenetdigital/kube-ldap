@@ -69,6 +69,7 @@ export default class Client {
         reject(new Error('ldap connection not tls protected'));
       }
       let that = this;
+
       this.client.bind(this.binddn, this.bindpw, [], (err, res) => {
         if (err) {
           reject(err);
@@ -84,8 +85,9 @@ export default class Client {
             reject(err);
           }
 
+          var entries = []
           res.on('searchEntry', function(entry) {
-            resolve(entry.object);
+            entries.push(entry.object)
           });
           res.on('error', function(err) {
             reject(err);
@@ -93,6 +95,8 @@ export default class Client {
           res.on('end', function(result) {
             if (result.status !== 0) {
               reject(result.status);
+            } else {
+              resolve(entries)
             }
             reject(new Error(`no object found with filter [${filter}]`));
           });
