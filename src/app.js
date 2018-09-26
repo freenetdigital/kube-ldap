@@ -8,7 +8,7 @@ import ldap from 'ldapjs';
 import {config} from './config';
 import logger from './logger';
 import {Client, Authenticator, Mapping} from './ldap';
-import {Healthz, UserAuthentication, TokenAuthentication} from './api';
+import {Healthz, UserAuthentication, TokenAuthentication, CACert} from './api';
 
 // setup basic dependencies
 let ldapClient = new Client(
@@ -42,6 +42,7 @@ let userAuthentication = new UserAuthentication(
   ),
   logger);
 let tokenAuthentication = new TokenAuthentication(config.jwt.key, logger);
+let cacert = new CACert();
 
 // setup express
 const app = express();
@@ -56,5 +57,6 @@ app.use(morgan('combined', {
 app.get('/healthz', healthz.run);
 app.get('/auth', userAuthentication.run);
 app.post('/token', bodyParser.json(), tokenAuthentication.run);
+app.get('/cacert', cacert.run);
 
 export default app;

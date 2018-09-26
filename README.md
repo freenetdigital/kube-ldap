@@ -14,6 +14,9 @@ It exposes two API endpoints:
 * /token
   * Is called by kubernetes (see [TokenReview](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.9/#tokenreview-v1-authentication)) to verify the token used for authentication.
   * Verifies the integrity of the JWT (using the signature) and returns a TokenReview response containing the username, uid and group memberships of the authenticated user.
+* /cacert
+  * provides the ca.crt from the cluster to be used in the kubectl configuration
+  * CA file has to be mounted in the pod at /etc/kubernetes/pki/ca.crt
 
 ## Deployment
 The recommended way to deploy kube-ldap is deplyoing kube-ldap in kubernetes itself using the [gyselroth/kube-ldap](https://hub.docker.com/r/gyselroth/kube-ldap/) docker image.
@@ -111,6 +114,15 @@ spec:
         name: kube-ldap
         ports:
         - containerPort: 8081
+        volumeMounts:
+        - mountPath: /etc/kubernetes/pki/ca.crt
+          name: k8s-ca-cert
+          readOnly: true
+      volumes:
+      - hostPath:
+        path: /etc/kubernetes/pki/ca.crt
+        type: File
+        name: k8s-ca-cert
 ---
 apiVersion: v1
 kind: Service
@@ -187,7 +199,8 @@ contexts:
 To configure `kubectl` initially:
 ```bash
 curl TOKEN=$(https://your-kube-ldap-url/auth -u your-username)
-kubectl config set-cluster your-cluster --server=https://your-apiserver-url [...]
+curl -o /tmp/cluster-ca.crt https://your-kube-ldap-url/cacert
+kubectl config set-cluster your-cluster --server=https://your-apiserver-url --certificate-authority=/tmp/cluster-ca.crt --embed-certs=true
 kubectl config set-credentials your-cluster-ldap --token="$TOKEN"
 kubectl config set-context your-cluster --cluster=your-cluster --user=your-cluster-ldap
 ```
