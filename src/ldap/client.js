@@ -17,12 +17,17 @@ export default class Client {
   constructor(conn: Object, basedn: string, binddn: string, bindpw: string) {
     this.client = conn;
     this._secure = false;
-    this.client.starttls({}, [], (err, res) => {
-      if (err) {
-        throw err;
-      }
+
+    if(this.client.secure) {
       this._secure = true;
-    });
+    } else {
+      this.client.starttls({}, [], (err, res) => {
+        if (err) {
+          throw err;
+        }
+        this._secure = true;
+      });
+    }
     this.basedn = basedn;
     this.binddn = binddn;
     this.bindpw = bindpw;
