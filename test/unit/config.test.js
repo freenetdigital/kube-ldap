@@ -3,8 +3,8 @@ import {getConfig} from '../../src/config';
 const fixtures = {
   'loglevel': {
     env: 'LOGLEVEL',
-    default: 'debug',
-    testValues: ['info'],
+    default: 'info',
+    testValues: ['debug'],
   },
   'ldap.uri': {
     env: 'LDAP_URI',
@@ -78,6 +78,7 @@ const fixtures = {
     default: true,
     testValues: [
       {value: 'false', expected: false},
+      {value: 'true', expected: true},
       {value: 'abc', expected: true},
     ],
   },
@@ -95,6 +96,29 @@ const fixtures = {
     env: 'TLS_CA_PATH',
     default: null,
     testValues: ['/etc/ssl/example.com/ca.pem'],
+  },
+  'prometheus.username': {
+    env: 'PROMETHEUS_USERNAME',
+    default: 'prometheus',
+    testValues: [
+      {value: 'john.doe', expected: 'john.doe'},
+      {value: '', expected: null},
+    ],
+  },
+  'prometheus.password': {
+    env: 'PROMETHEUS_PASSWORD',
+    default: 'secret',
+    testValues: [
+      {value: 'password', expected: 'password'},
+      {value: '', expected: null},
+    ],
+  },
+  'prometheus.nodejsProbeInterval': {
+    env: 'PROMETHEUS_NODEJS_PROBE_INTERVAL',
+    default: 10000,
+    testValues: [
+      {value: '5000', expected: 5000},
+    ],
   },
   'port': {
     env: 'PORT',

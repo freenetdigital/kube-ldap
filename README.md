@@ -9,14 +9,14 @@ A [Webhook Token Authentication](https://kubernetes.io/docs/admin/authentication
 The kube-ldap webhook token authentication plugin can be used to integrate username/password authentication via LDAP for your kubernetes cluster.
 It exposes two API endpoints:
 * /auth
- * HTTP basic authenticated requests to this endpoint result in a JSON Web Token, signed by the webhook, including the username, uid and group memberships of the authenticated user.
- * The issued token can be used for authenticating to kubernetes.
+  * HTTP basic authenticated requests to this endpoint result in a JSON Web Token, signed by the webhook, including the username and uid of the authenticated user.
+  * The issued token can be used for authenticating to kubernetes.
 * /token
   * Is called by kubernetes (see [TokenReview](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.9/#tokenreview-v1-authentication)) to verify the token used for authentication.
-  * Verifies the integrity of the JWT (using the signature) and returns a TokenReview response containing the username, uid and group memberships of the authenticated user.
 * /cacert
   * provides the ca.crt from the cluster to be used in the kubectl configuration
   * CA file has to be mounted in the pod at /etc/kubernetes/pki/ca.crt
+  * Verifies the integrity of the JWT (using the signature) and returns a TokenReview response containing the username, uid, group memberships and extra attributes (if configured) of the authenticated user.
 
 ## Deployment
 The recommended way to deploy kube-ldap is deplyoing kube-ldap in kubernetes itself using the [gyselroth/kube-ldap](https://hub.docker.com/r/gyselroth/kube-ldap/) docker image.
@@ -50,7 +50,7 @@ kind: Secret
 metadata:
   name: kube-ldap-tls
   namespace: kube-system
-type: kubernetes.io/tls
+type: Opaque
 ---
 apiVersion: apps/v1beta2
 kind: Deployment
@@ -100,7 +100,7 @@ spec:
               key: key
         - name: JWT_TOKEN_LIFETIME
           value: #jwt token lifetime (see "Configuration" in README)
-        image: gyselroth/kube-ldap
+        image: gyselroth/kube-ldap:latest # Better use fixed version tag here since 'latest' can point to new major releases with breaking changes
         volumeMounts:
           - name: kube-ldap-tls
             mountPath: "/etc/ssl/kube-ldap"
@@ -151,7 +151,7 @@ List of configurable values:
 |Setting|Description|Environment Variable| Default Value|
 |-------|-----------|--------------------|--------------|
 |`config.port`|HTTP port to listen|`PORT`|8081 (8080 if TLS is disabled)|
-|`config.loglevel`|Loglevel for winston logger|`LOGLEVEL`|debug|
+|`config.loglevel`|Loglevel for winston logger. **CAUTION: debug loglevel may log sensitive parameters like user passwords**|`LOGLEVEL`|info|
 |`config.tls.enabled`|Enable TLS (HTTPS). **DO NOT DISABLE IN PRODUCTION UNLESS YOU HAVE A TLS REVERSE PROXY IN PLACE**|`TLS_ENABLED` ("true" or "false")|true|
 |`config.tls.cert`|Path to certificate (pem) to use for TLS (HTTPS)|`TLS_CERT_PATH`|/etc/ssl/kube-ldap/cert.pem|
 |`config.tls.key`|Path to private key (pem) to use for TLS (HTTPS)|`TLS_KEY_PATH`|/etc/ssl/kube-ldap/key.pem|
@@ -162,9 +162,6 @@ List of configurable values:
 |`config.ldap.baseDn`|Base DN for LDAP search|`LDAP_BASEDN`|dc=example,dc=com|
 |`config.ldap.filter`|Filter for LDAP search|`LDAP_FILTER`|(uid=%s)|
 |`config.ldap.timeout`|Timeout for LDAP connections & operations (in seconds)|`LDAP_TIMEOUT`|0 (infinite for operations, OS default for connections)|
-|`config.ldap.reconnectInitialDelay`|Seconds to wait before reconnecting|`LDAP_RECONN_INIT_DELAY`|100|
-|`config.ldap.reconnectMaxDelay`|Maximum seconds to wait before reconnecting|`LDAP_RECONN_MAX_DELAY`|1000|
-|`config.ldap.reconnectFailAfter`|Fail after number of retries|`LDAP_RECONN_FAIL_AFTER`|10|
 |`config.mapping.username`|Name of ldap attribute to be used as username in kubernetes TokenReview|`MAPPING_USERNAME`|uid|
 |`config.mapping.uid`|Name of ldap attribute to be used as uid in kubernetes TokenReview|`MAPPING_UID`|uid|
 |`config.mapping.groups`|Name of ldap attribute to be used for groups in kubernetes TokenReview|`MAPPING_GROUPS`|memberOf|
@@ -172,6 +169,9 @@ List of configurable values:
 |`config.mapping.username`|Name of Ldap attribute to be used as username in kubernetes TokenReview|`MAPPING_USERNAME`|uid|
 |`config.jwt.key`|Key for signing the JWT. **DO NOT USE THE DEFAULT VALUE IN PRODUCTION**|`JWT_KEY`|secret|
 |`config.jwt.tokenLifetime`|Seconds until token a expires|`JWT_TOKEN_LIFETIME`|28800|
+|`config.prometheus.username`|Username for prometheus exporter basic auth (use empty string to disable basic auth)|`PROMETHEUS_USERNAME`|prometheus|
+|`config.prometheus.password`|Password for prometheus exporter basic auth (use empty string to disable basic auth)|`PROMETHEUS_PASSWORD`|secret|
+|`config.prometheus.nodejsProbeInterval`|Probe interval for nodejs metrics in milliseconds|`PROMETHEUS_NODEJS_PROBE_INTERVAL`|10000|
 
 ### kubernetes
 Configure your kubernetes apiserver to use the kube-ldap [webhook for authentication](https://kubernetes.io/docs/admin/authentication/#webhook-token-authentication) using the following configuration file.
@@ -196,18 +196,25 @@ contexts:
 ```
 
 ### kubectl
-To configure `kubectl` initially:
+You can either use [kube-ldap-client-go-exec-plugin](https://github.com/gyselroth/kube-ldap-client-go-exec-plugin), a kubectl plugin ([client-go credential plugin](https://kubernetes.io/docs/reference/access-authn-authz/authentication/#client-go-credential-plugins)) doing the authentication for you, or you can do it manually.
+
+To configure `kubectl` for manual authentication initially:
 ```bash
+<<<<<<< HEAD
 curl TOKEN=$(https://your-kube-ldap-url/auth -u your-username)
 curl -o /tmp/cluster-ca.crt https://your-kube-ldap-url/cacert
 kubectl config set-cluster your-cluster --server=https://your-apiserver-url --certificate-authority=/tmp/cluster-ca.crt --embed-certs=true
+=======
+TOKEN=$(curl https://your-kube-ldap-url/auth -u your-username)
+kubectl config set-cluster your-cluster --server=https://your-apiserver-url [...]
+>>>>>>> 486874a9bd5f48f6641c583c503ca4179d4a3452
 kubectl config set-credentials your-cluster-ldap --token="$TOKEN"
 kubectl config set-context your-cluster --cluster=your-cluster --user=your-cluster-ldap
 ```
 
 To refresh your token after expiration:
 ```bash
-curl TOKEN=$(https://your-kube-ldap-url/auth -u your-username)
+TOKEN=$(curl https://your-kube-ldap-url/auth -u your-username)
 kubectl config set-credentials your-cluster-ldap --token="$TOKEN"
 ```
 
