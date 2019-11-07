@@ -1,8 +1,10 @@
 import Client from '../../../src/ldap/client';
-import ldap from 'ldapjs';
-jest.mock('ldapjs');
+import {Client as Connection} from 'ldapts';
 
 const fixtures = {
+  basedn: 'dc=example,dc=com',
+  binddn: 'uid=bind,dc=example,dc=com',
+  bindpw: 'secret',
   username: 'john.doe',
   dn: 'uid=john.doe,dc=example,dc=com',
   password: 'secret',
@@ -16,20 +18,30 @@ const fixtures = {
   ],
 };
 
-let connection = ldap.createClient();
-let client = new Client(connection);
+let connection = new Connection();
+let connectionFactory = () => {
+  return connection;
+};
+let client = null;
 
 beforeEach(() => {
   connection.starttlsReturnsError = false;
   connection.bindReturnsError = false;
   connection.searchReturnsError = false;
   connection.searchEmitsError = false;
-  connection.searchEmitsEnd = false;
+  connection.searchEmitsResult = true;
   connection.searchEmitsEndStatus = 0;
   connection.searchResult = {
     uid: fixtures.username,
     memberOf: fixtures.groups,
   };
+  client = new Client(
+    connectionFactory,
+    fixtures.basedn,
+    fixtures.binddn,
+    fixtures.bindpw,
+    true
+  );
 });
 
 describe('Client.bind()', () => {
@@ -69,17 +81,8 @@ describe('Client.search()', () => {
     ).rejects.toEqual(new Error('error by mock'));
   });
 
-  test('Rejects on error event', () => {
-    connection.searchEmitsError = true;
-
-    expect.hasAssertions();
-    return expect(
-      client.search(fixtures.filter)
-    ).rejects.toEqual(new Error('error by mock'));
-  });
-
   test('Rejects on empty result', () => {
-    connection.searchEmitsEnd = true;
+    connection.searchReturnsResult = false;
 
     expect.hasAssertions();
     return expect(
@@ -87,15 +90,5 @@ describe('Client.search()', () => {
     ).rejects.toEqual(new Error(
       `no object found with filter [${fixtures.filter}]`
     ));
-  });
-
-  test('Rejects on search end with status != 0', () => {
-    connection.searchEmitsEnd = true;
-    connection.searchEmitsEndStatus = 1;
-
-    expect.hasAssertions();
-    return expect(
-      client.search(fixtures.filter)
-    ).rejects.toBe(connection.searchEmitsEndStatus);
   });
 });

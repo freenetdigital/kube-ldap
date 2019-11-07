@@ -1,13 +1,7 @@
 // @flow
 
 const parseBooleanFromEnv = (env: ?string, defaultValue: boolean): boolean => {
-  if (env == 'true') {
-    return true;
-  }
-  if (env == 'false') {
-    return false;
-  }
-  return defaultValue;
+  return env == 'true' ? true : (env == 'false' ? false : defaultValue);
 };
 
 const parseArrayFromEnv = (
@@ -15,15 +9,19 @@ const parseArrayFromEnv = (
   delimiter: string,
   defaultValue: Array<string>
 ): Array<string> => {
-  if (env) {
-    return env.split(delimiter);
-  }
-  return defaultValue;
+  return env ? env.split(delimiter) : defaultValue;
+};
+
+const parseNullableFromEnv = (
+  env: ?string,
+  defaultValue: any,
+): any => {
+  return typeof(env) === 'undefined' ? defaultValue : (env || null);
 };
 
 const getConfig = () => {
   let config = {
-    loglevel: process.env.LOGLEVEL || 'debug',
+    loglevel: process.env.LOGLEVEL || 'info',
     ldap: {
       uri: process.env.LDAP_URI || 'ldap://ldap.example.com',
       bindDn: process.env.LDAP_BINDDN || 'uid=bind,dc=example,dc=com',
@@ -31,9 +29,6 @@ const getConfig = () => {
       baseDn: process.env.LDAP_BASEDN || 'dc=example,dc=com',
       filter: process.env.LDAP_FILTER || '(uid=%s)',
       timeout: parseInt(process.env.LDAP_TIMEOUT) || 0,
-      reconnectInitialDelay: parseInt(process.env.LDAP_RECONN_INIT_DELAY) || 100,
-      reconnectMaxDelay: parseInt(process.env.LDAP_RECONN_MAX_DELAY) || 1000,
-      reconnectFailAfter: parseInt(process.env.LDAP_RECONN_FAIL_AFTER) || 10,
     },
     mapping: {
       username: process.env.MAPPING_USERNAME || 'uid',
@@ -54,6 +49,16 @@ const getConfig = () => {
       cert: process.env.TLS_CERT_PATH || '/etc/ssl/kube-ldap/cert.pem',
       key: process.env.TLS_KEY_PATH || '/etc/ssl/kube-ldap/key.pem',
       ca: process.env.TLS_CA_PATH || null,
+    },
+    prometheus: {
+      username: parseNullableFromEnv(
+        process.env.PROMETHEUS_USERNAME,
+        'prometheus'
+        ),
+      password: parseNullableFromEnv(process.env.PROMETHEUS_PASSWORD, 'secret'),
+      nodejsProbeInterval: parseInt(
+        process.env.PROMETHEUS_NODEJS_PROBE_INTERVAL
+      ) || 10000,
     },
     port: 0,
   };
