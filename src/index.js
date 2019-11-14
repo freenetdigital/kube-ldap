@@ -10,6 +10,7 @@ if (config.tls.enabled) {
     cert: fs.readFileSync(config.tls.cert),
     key: fs.readFileSync(config.tls.key),
     ca: config.tls.ca ? fs.readFileSync(config.tls.ca) : null,
+    handshakeTimeout: 10000,
   }, app).listen(config.port, () => {
     logger.info(`kube-ldap listening on https port ${config.port}`);
   });
